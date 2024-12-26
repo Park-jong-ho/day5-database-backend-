@@ -1,38 +1,83 @@
-import getPageStartEnd from "../../util/getPageStartEnd.mjs";
-import { commentCreate, commentFindMany } from "./model.mjs";
+import {
+  PrismaClientKnownRequestError,
+  PrismaClientValidationError,
+} from "@prisma/client/runtime/library";
+import { likeCount, likeCreate, likeDelete, myLikeCount } from "./model.mjs";
 
-export const getAll = async (req, res) => {
-  const limit = req.query.limit || 10;
-  const page = req.query.page || 1;
-  const post_id = req.params.postId;
-  const { pageStart, pageEnd } = getPageStartEnd(Number(limit), Number(page));
+export const getCounts = async (req, res) => {
+  const post_id = req.params.id;
+  const isCount = req.query.count;
+  if (!isCount || isCount.toLowerCase() === "false")
+    return res.status(400).json({ error: "Bad Request" });
 
   try {
-    const result = await commentFindMany(pageStart, pageEnd, Number(post_id));
-    if (!result) return res.status(404).json({ error: "Not Found" });
-    return res.status(200).json({ data: result });
+    const count = await likeCount(Number(post_id));
+    return res.json({ count });
+  } catch (e) {
+    return res.status(500).json({ error: e.stack });
+  }
+};
+
+export const getLiked = async (req, res) => {
+  const post_id = Number(req.params.id);
+  const customer_id = Number(req.params.customerId);
+
+  try {
+    const isLiked = Boolean(await myLikeCount({ post_id, customer_id }));
+    return res.json({ isLiked });
   } catch (e) {
     return res.status(500).json({ error: e.stack });
   }
 };
 
 export const createOne = async (req, res) => {
-  const content = req.body.content;
+  const reaction_type = req.body.reactionType;
   const customer_id = req.body.customerId;
   const post_id = req.body.postId;
-  if (!post_id || !customer_id || !content)
+  if (!post_id || !customer_id || !reaction_type)
     return res.status(400).json({ error: "Bad Request" });
 
   const like = {
     post_id,
     customer_id,
-    content,
+    reaction_type,
   };
 
   try {
-    const result = await commentCreate(like);
+    const result = await likeCreate(like);
     return res.status(200).json({ data: result });
   } catch (e) {
-    return res.status(400).json({ error: e.stack });
+    if (
+      e instanceof PrismaClientKnownRequestError ||
+      e instanceof PrismaClientValidationError
+    )
+      // REF: https://www.prisma.io/docs/orm/prisma-client/debugging-and-troubleshooting/handling-exceptions-and-errors
+      // REF: https://www.prisma.io/docs/orm/reference/error-reference#prismaclientvalidationerror
+      return res.status(400).json({ error: e.stack });
+    return res.status(500).json({ error: e.stack });
+  }
+};
+
+export const deleteOne = async (req, res) => {
+  const post_id = Number(req.params.id);
+  const customer_id = Number(req.params.customerId);
+  if (!post_id || !customer_id)
+    return res.status(400).json({ error: "Bad Request" });
+
+  const like = {
+    post_id,
+    customer_id,
+  };
+
+  try {
+    const result = await likeDelete(like);
+    return res.status(200).json({ data: result });
+  } catch (e) {
+    if (
+      e instanceof PrismaClientKnownRequestError ||
+      e instanceof PrismaClientValidationError
+    )
+      return res.status(400).json({ error: e.stack });
+    return res.status(500).json({ error: e.stack });
   }
 };
