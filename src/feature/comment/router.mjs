@@ -1,10 +1,12 @@
 import express from "express";
-import { createOne, getAll } from "./controller.mjs";
+import { getAll, getOne } from "./controller.mjs";
 
 const router = express.Router();
-// router.get("/:commentId", getAll);
-// router.post("/", createOne);
 
-export const commentRouter = router;
-export const commentGetRouter = getAll;
-export const commentCreateRouter = createOne;
+// GET film
+router.get("/", getAll);
+
+// GET film/:id
+router.get("/:id", getOne);
+
+export const filmRouter = router;
